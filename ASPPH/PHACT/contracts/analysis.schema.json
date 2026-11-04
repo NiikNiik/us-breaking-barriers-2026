@@ -125,6 +125,86 @@
    "title": "CompetencyMapping",
    "type": "object"
   },
+  "DocCheckResult": {
+   "properties": {
+    "verdict": {
+     "enum": [
+      "OK",
+      "NOT_A_SYLLABUS",
+      "NOT_PUBLIC_HEALTH",
+      "UNCERTAIN"
+     ],
+     "title": "Verdict",
+     "type": "string"
+    },
+    "message": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "User-facing explanation when verdict is not OK",
+     "title": "Message"
+    },
+    "documentType": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Documenttype"
+    },
+    "confidence": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Confidence"
+    },
+    "syllabusSignals": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Syllabussignals",
+     "type": "array"
+    },
+    "missingSections": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Missingsections",
+     "type": "array"
+    },
+    "method": {
+     "enum": [
+      "heuristic",
+      "classifier",
+      "heuristic_fallback"
+     ],
+     "title": "Method",
+     "type": "string"
+    }
+   },
+   "required": [
+    "verdict",
+    "method"
+   ],
+   "title": "DocCheckResult",
+   "type": "object"
+  },
   "Recommendation": {
    "properties": {
     "id": {
@@ -272,9 +352,11 @@
    "type": "string"
   },
   "status": {
+   "description": "BLOCKED = guardrail; REJECTED = wrong document (see documentCheck); nothing reaches the agents in either case",
    "enum": [
     "SUCCEEDED",
     "BLOCKED",
+    "REJECTED",
     "FAILED"
    ],
    "title": "Status",
@@ -355,8 +437,19 @@
     }
    ],
    "default": null,
-   "description": "User-facing message when status is BLOCKED or FAILED",
+   "description": "User-facing message when status is BLOCKED, REJECTED or FAILED",
    "title": "Message"
+  },
+  "documentCheck": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/DocCheckResult"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
   },
   "piiRedactions": {
    "default": 0,

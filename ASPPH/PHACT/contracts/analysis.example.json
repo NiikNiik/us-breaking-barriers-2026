@@ -145,6 +145,24 @@
   "Removed 1 email/phone pattern(s) from the revised syllabus."
  ],
  "message": null,
+ "documentCheck": {
+  "verdict": "OK",
+  "message": null,
+  "documentType": "course syllabus",
+  "confidence": 0.95,
+  "syllabusSignals": [
+   "learning outcomes or objectives",
+   "schedule",
+   "assessment and grading",
+   "assignments",
+   "instructor and office hours",
+   "course identity"
+  ],
+  "missingSections": [
+   "course policies"
+  ],
+  "method": "classifier"
+ },
  "piiRedactions": 2,
  "timingsMs": {
   "safety": 5,

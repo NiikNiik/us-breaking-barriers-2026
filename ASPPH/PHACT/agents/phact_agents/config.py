@@ -10,6 +10,8 @@ import os
 from dataclasses import dataclass
 
 DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+# Small, fast model for the wrong-document check; confirm access in the account.
+DEFAULT_CHECK_MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
 def _int(name: str, default: int) -> int:
@@ -34,6 +36,8 @@ class Settings:
     postprocess_function: str | None = None
     agent_max_tokens: int = 4_000
     synthesis_max_tokens: int = 10_000
+    doc_check: bool = True
+    check_model_id: str = DEFAULT_CHECK_MODEL_ID
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -54,4 +58,6 @@ class Settings:
             postprocess_function=env("POSTPROCESS_FUNCTION"),
             agent_max_tokens=_int("AGENT_MAX_TOKENS", 4_000),
             synthesis_max_tokens=_int("SYNTHESIS_MAX_TOKENS", 10_000),
+            doc_check=(env("DOC_CHECK") or "on").lower() != "off",
+            check_model_id=env("CHECK_MODEL_ID") or DEFAULT_CHECK_MODEL_ID,
         )

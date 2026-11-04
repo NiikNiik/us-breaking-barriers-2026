@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from phact_agents.config import Settings  # noqa: E402
+from phact_agents.doc_check import DocumentCheck  # noqa: E402
 from phact_agents.evidence import Chunk  # noqa: E402
 from phact_agents.pipeline import Dependencies  # noqa: E402
 from phact_agents.safety import InputSafety  # noqa: E402
@@ -20,12 +21,24 @@ from phact_agents.schemas import (  # noqa: E402
 )
 
 SYLLABUS = """EPID 601: Applied Epidemiologic Methods
+School of Public Health | Fall 2026 | 3 graduate credits
 Instructor: Dr. Test Person | test.person@example.edu | 617-555-0100
+Course description
+This course introduces epidemiologic reasoning and applied methods for investigating health patterns in populations.
 Learning outcomes
 - Calculate and interpret incidence, prevalence and risk ratios.
 - Analyze a de-identified public health dataset using reproducible code.
+Assessment and grading
+Weekly problem sets 30% | Critical appraisal memo 15% | Midterm exam 20% | Final analysis report 35%
+Weekly schedule
 Week 7 | Bias and measurement error | Critical appraisal memo due
 Final analysis report (2,500-3,000 words plus reproducible code)."""
+
+RESUME = """Jordan Smith - Data Analyst
+Experience: Data Analyst, Acme Corp, 2022-2025. Built dashboards in Tableau and SQL; reduced reporting time.
+Education: BS Statistics, State University, 2022. Skills: Python, SQL, Tableau, Excel, stakeholder communication.
+Projects: churn prediction model; sales forecasting; automated weekly KPI emails for the leadership team.
+References available on request. Volunteer: food bank coordinator, 2019-2022; mentor for first-year students."""
 
 
 class FakeRetriever:
@@ -49,17 +62,21 @@ class FakeRetriever:
 class ScriptedRunner:
     """Stands in for Strands: calls the search tool like an agent would, then returns canned output."""
 
-    def __init__(self, delay: float = 0.2, fail: set[str] | None = None):
+    def __init__(self, delay: float = 0.2, fail: set[str] | None = None, doc_check: DocumentCheck | None = None):
         self.delay = delay
         self.fail = fail or set()
+        self.doc_check = doc_check or DocumentCheck(is_syllabus=True, is_public_health=True,
+                                                    document_type="course syllabus", confidence=0.95, reason="ok")
         self.calls: dict[str, dict] = {}
 
-    async def run(self, *, name, system_prompt, prompt, tools, output_model, max_tokens):
+    async def run(self, *, name, system_prompt, prompt, tools, output_model, max_tokens, model_id=None):
         start = time.perf_counter()
-        self.calls[name] = {"prompt": prompt, "start": start, "tools": [t.__name__ for t in tools]}
-        await asyncio.sleep(self.delay)
+        self.calls[name] = {"prompt": prompt, "start": start, "tools": [t.__name__ for t in tools], "model_id": model_id}
         if name in self.fail:
             raise RuntimeError(f"{name} exploded")
+        if output_model is DocumentCheck:
+            return self.doc_check
+        await asyncio.sleep(self.delay)
         results = json.loads(tools[0]("course objectives")) if tools else None
         ids = [r["evidence_id"] for r in (results or {}).get("results", [])]
         self.calls[name]["end"] = time.perf_counter()

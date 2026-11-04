@@ -11,6 +11,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .doc_check import DocCheckResult
+
 Alignment = Literal["Strong Alignment", "Partial Alignment", "Gap Identified"]
 IntegrationType = Literal["AI_ASSISTED", "AI_RESISTANT", "AI_LITERACY", "NO_CHANGE"]
 
@@ -137,7 +139,8 @@ class AnalysisResult(BaseModel):
     schemaVersion: str
     jobId: str
     syllabusId: str
-    status: Literal["SUCCEEDED", "BLOCKED", "FAILED"]
+    status: Literal["SUCCEEDED", "BLOCKED", "REJECTED", "FAILED"] = Field(
+        description="BLOCKED = guardrail; REJECTED = wrong document (see documentCheck); nothing reaches the agents in either case")
     generatedAt: str
     modelId: str
     corpusVersion: str | None
@@ -147,6 +150,7 @@ class AnalysisResult(BaseModel):
     revisedSyllabus: RevisedSyllabus | None = None
     evidence: list[Citation] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
-    message: str | None = Field(default=None, description="User-facing message when status is BLOCKED or FAILED")
+    message: str | None = Field(default=None, description="User-facing message when status is BLOCKED, REJECTED or FAILED")
+    documentCheck: DocCheckResult | None = None
     piiRedactions: int = 0
     timingsMs: dict[str, int] = Field(default_factory=dict)

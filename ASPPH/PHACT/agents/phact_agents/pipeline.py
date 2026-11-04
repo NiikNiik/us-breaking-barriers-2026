@@ -1,7 +1,7 @@
 """The three-agent analysis: Agents 1 and 2 concurrently, then Agent 3.
 
-    syllabus ─► PII scrub ─► input guardrail ─┬─► Agent 1 (competency KB) ──┐
-                                              └─► Agent 2 (syllabus KB) ────┴─► Agent 3 ─► validate ─► result
+    syllabus ─► PII scrub ─► input guardrail ─► wrong-document check ─┬─► Agent 1 (competency KB) ──┐
+                                                                      └─► Agent 2 (syllabus KB) ────┴─► Agent 3 ─► validate ─► result
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 
 from . import SCHEMA_VERSION
 from .config import Settings
+from .doc_check import check_document
 from .evidence import Evidence, EvidenceStore, Retriever, make_search_tool
 from .prompts import (
     COMPETENCY_AGENT_PROMPT,
@@ -50,6 +51,8 @@ class AnalysisRequest:
     syllabus_id: str
     syllabus_text: str
     course_name: str | None = None
+    # Faculty confirmed "analyse anyway" after a NOT_PUBLIC_HEALTH warning.
+    confirm_relevance: bool = False
 
 
 @dataclass
@@ -87,6 +90,18 @@ async def analyze(request: AnalysisRequest, deps: Dependencies) -> AnalysisResul
                               piiRedactions=protected.redactions, timingsMs=timings)
     text = protected.text
 
+    warnings: list[str] = []
+    check = None
+    if settings.doc_check:
+        with _timer(timings, "doc_check"):
+            check = await check_document(text, deps.runner, settings.check_model_id)
+        overridden = check.verdict == "NOT_PUBLIC_HEALTH" and request.confirm_relevance
+        if check.blocks and not overridden:
+            return AnalysisResult(**base, status="REJECTED", message=check.message, documentCheck=check,
+                                  piiRedactions=protected.redactions, timingsMs=timings)
+        if check.message:
+            warnings.append(check.message)
+
     competency_store = EvidenceStore("C", "competency")
     syllabus_store = EvidenceStore("S", "syllabus")
     competency_search = make_search_tool(
@@ -121,7 +136,6 @@ async def analyze(request: AnalysisRequest, deps: Dependencies) -> AnalysisResul
         return_exceptions=True,
     )
 
-    warnings: list[str] = []
     competency = _ok_or_warn(competency_raw, "Competency agent", warnings)
     examples = _ok_or_warn(syllabus_raw, "Approved syllabus agent", warnings)
     if competency is None and examples is None:
@@ -203,6 +217,7 @@ async def analyze(request: AnalysisRequest, deps: Dependencies) -> AnalysisResul
         revisedSyllabus=RevisedSyllabus(title=revised.title, changeSummary=revised.change_summary, markdown=markdown),
         evidence=[_citation(e) for e in catalogue],
         warnings=warnings,
+        documentCheck=check,
         piiRedactions=protected.redactions,
         timingsMs=timings,
     )

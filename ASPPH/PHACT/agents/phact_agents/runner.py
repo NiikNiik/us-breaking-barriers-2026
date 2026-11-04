@@ -25,6 +25,7 @@ class AgentRunner(Protocol):
         tools: list[Callable[[str], str]],
         output_model: type[T],
         max_tokens: int,
+        model_id: str | None = None,
     ) -> T: ...
 
 
@@ -34,13 +35,13 @@ class StrandsRunner:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    async def run(self, *, name, system_prompt, prompt, tools, output_model, max_tokens):
+    async def run(self, *, name, system_prompt, prompt, tools, output_model, max_tokens, model_id=None):
         from botocore.config import Config
         from strands import Agent, tool
         from strands.models import BedrockModel
 
         model = BedrockModel(
-            model_id=self.settings.model_id,
+            model_id=model_id or self.settings.model_id,
             region_name=self.settings.region,
             max_tokens=max_tokens,
             temperature=0.2,
