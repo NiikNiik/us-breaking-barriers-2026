@@ -21,6 +21,12 @@ The app uses `HashRouter` so static hosting and refreshes work without server re
 
 Pages call the selected `api` service boundary and retain their existing local UI state. Mock mode persists demo workflow state in browser storage. Live mode is intentionally conservative until backend contracts are approved.
 
+## Two-sided approval workflow
+
+The faculty `Review & Approval` page owns complete syllabus drafts, not individual AI recommendation decisions. Faculty-approved recommendation IDs and confirmed mapping IDs are captured when a deterministic mock draft is generated. Draft sections can be edited, saved, compared with the original extracted artifact, and submitted as an immutable version.
+
+The administrator `Final Syllabus Approvals` route reads the same mock store. It reviews the complete submitted document, records a single approval or required-reason rejection, and preserves the historical version. A rejected version creates a new version for faculty revision; it never mutates the historical submission.
+
 ## Integration boundaries
 
 The frontend never calls AWS services directly and contains no credentials. Backend authentication, presigned uploads, analysis orchestration, persistence, and authorization remain teammate-owned responsibilities.

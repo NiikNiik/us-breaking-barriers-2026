@@ -8,10 +8,12 @@ const MAX_MB = 10
 const SUBJECTS = ["Epidemiology", "Biostatistics", "Ethics", "Environmental Health", "Health Policy", "Global Health", "Community Health", "Health Equity"]
 
 function validateFile(file: File): string {
-  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
-  if (!isPdf) return "Only PDF files can be uploaded. You can also paste syllabus text instead."
-  if (file.size === 0) return "This file is empty. Choose another PDF."
-  if (file.size > MAX_MB * 1024 * 1024) return `This file is larger than ${MAX_MB} MB. Upload a smaller PDF or paste the text.`
+  const lower = file.name.toLowerCase()
+  const isPdf = file.type === "application/pdf" || lower.endsWith(".pdf")
+  const isDocx = file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || lower.endsWith(".docx")
+  if (!isPdf && !isDocx) return "Only PDF or DOCX files can be uploaded. You can also paste syllabus text instead."
+  if (file.size === 0) return "This file is empty. Choose another document."
+  if (file.size > MAX_MB * 1024 * 1024) return `This file is larger than ${MAX_MB} MB. Upload a smaller document or paste the text.`
   return ""
 }
 
@@ -51,7 +53,7 @@ export function Upload({ ctx }: { ctx: AppCtx }) {
 
   const analyze = async () => {
     setError("")
-    if (!file && !pasted) return setError("Add a PDF or paste your syllabus text first.")
+    if (!file && !pasted) return setError("Add a PDF, DOCX, or paste your syllabus text first.")
     if (pasted && text.trim().length < 80) return setError("Pasted text is very short. Include objectives, modules, and assignments (at least 80 characters).")
     if (!course.trim()) return setError("Enter a course name.")
     try {
@@ -101,7 +103,7 @@ export function Upload({ ctx }: { ctx: AppCtx }) {
               }}
             >
               <span className="upload-icon"><Icon name="upload" size={24} /></span>
-              <b>Drag and drop your syllabus PDF</b>
+              <b>Drag and drop your syllabus PDF or DOCX</b>
               <small>or browse files on your computer</small>
               <span className="small-button">Browse Files</span>
             </div>
@@ -118,7 +120,7 @@ export function Upload({ ctx }: { ctx: AppCtx }) {
               <div>
                 {busy ? <Status tone="blue">Uploading {progress}%</Status> : <Status tone="good">Ready to upload</Status>}
                 <h3>{file.name}</h3>
-                <p>{(file.size / 1024 / 1024).toFixed(2)} MB · PDF document</p>
+                <p>{(file.size / 1024 / 1024).toFixed(2)} MB · {file.name.toLowerCase().endsWith(".docx") ? "DOCX" : "PDF"} document</p>
                 {busy && (
                   <div className="progress-bar slim"><span style={{ width: `${progress}%` }} /></div>
                 )}
@@ -131,7 +133,7 @@ export function Upload({ ctx }: { ctx: AppCtx }) {
               </div>
             </div>
           )}
-          <input ref={input} type="file" accept=".pdf,application/pdf" onChange={(e) => pick(e.target.files?.[0])} hidden />
+          <input ref={input} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(e) => pick(e.target.files?.[0])} hidden />
           <ErrorNote>{fileError}</ErrorNote>
           <button className="text-button paste-toggle" onClick={() => setManual(!manual)} aria-expanded={manual}>
             <Icon name="file" /> {manual ? "Hide pasted text" : "Or paste syllabus text instead"} <Icon name="chevron" />

@@ -21,7 +21,8 @@ export const ROUTES: PhactRoute[] = [
   { id: "activity", path: "/activity", label: "My Activity", icon: "clock", roles: ["faculty"], group: "Library" },
   { id: "settings", path: "/settings", label: "Settings", icon: "settings", roles: ["faculty"], group: "Library" },
   { id: "knowledge-admin", path: "/admin/sources", label: "Knowledge Management", icon: "library", roles: ["admin"], group: "Administration" },
-  { id: "moderation", path: "/admin/queue", label: "Community Moderation", icon: "people", roles: ["admin"], group: "Administration" },
+  { id: "moderation", path: "/admin/queue", label: "Final Syllabus Approvals", icon: "review", roles: ["admin"], group: "Administration" },
+  { id: "community-moderation", path: "/admin/community", label: "Community Moderation", icon: "people", roles: ["admin"], group: "Administration" },
   { id: "privacy", path: "/privacy", label: "Privacy Policy", roles: ["public", "faculty", "admin"] },
   { id: "terms", path: "/terms", label: "Terms of Service", roles: ["public", "faculty", "admin"] },
 ]

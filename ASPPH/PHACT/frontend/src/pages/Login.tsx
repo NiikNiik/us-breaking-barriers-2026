@@ -15,7 +15,7 @@ export function Login({ onLogin }: { onLogin: (user: FacultyUser) => void }) {
   return (
     <div className="signin">
       <section className="signin-story">
-        <div className="brand light"><BrandMark /><div><b>PHACT</b><span>Public Health AI Curriculum Transformation</span></div></div>
+        <div className="brand light"><BrandMark full /></div>
         <div><p className="eyebrow">Responsible curriculum transformation</p><h1>Bring AI into public health education with purpose.</h1><p>Evidence-grounded recommendations, competency alignment, and faculty review in one guided workspace.</p></div>
         <small>Developed for the Association of Schools and Programs of Public Health</small>
       </section>
