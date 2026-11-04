@@ -16,6 +16,7 @@ import { Repository } from "./pages/Repository"
 import { Activity } from "./pages/Activity"
 import { Settings } from "./pages/Settings"
 import { KnowledgeAdmin, Moderation } from "./pages/Admin"
+import { AdminApprovals } from "./pages/AdminQueue"
 import { Legal } from "./pages/Legal"
 import type { AppCtx } from "./components/workspace"
 
@@ -70,8 +71,9 @@ function PhactApp() {
     if (next) navigate(next)
   }
   const logout = () => { api.signOut(); setUser(null); routerNavigate("/dashboard") }
+  const switchRole = async (nextRole: Role) => { const next = await api.switchRole(nextRole); setUser(next); routerNavigate(nextRole === "admin" ? "/admin/queue" : "/dashboard") }
 
-  if (!user) return <Login onLogin={(next) => { setUser(next); navigate(next.role === "admin" ? "knowledge-admin" : "dashboard") }} />
+  if (!user) return <Login onLogin={(next) => { setUser(next); navigate(next.role === "admin" ? "moderation" : "dashboard") }} />
 
   const effectivePage: Page = canAccessRoute(route, role) ? route.id : role === "admin" ? "knowledge-admin" : "dashboard"
   const ctx: AppCtx = { user, navigate, toast: setToast, activeJobId, openJob }
@@ -87,8 +89,9 @@ function PhactApp() {
     {effectivePage === "activity" && <Activity ctx={ctx} />}
     {effectivePage === "settings" && <Settings ctx={ctx} onUserChange={setUser} />}
     {effectivePage === "knowledge-admin" && <KnowledgeAdmin ctx={ctx} />}
-    {effectivePage === "moderation" && <Moderation ctx={ctx} />}
+    {effectivePage === "community-moderation" && <Moderation ctx={ctx} />}
+    {effectivePage === "moderation" && <AdminApprovals ctx={ctx} />}
     {(effectivePage === "privacy" || effectivePage === "terms") && <Legal type={effectivePage} />}
   </>
-  return <Layout user={user} role={role} page={effectivePage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} onLogout={logout} toast={toast}>{content}</Layout>
+  return <Layout user={user} role={role} page={effectivePage} menuOpen={menuOpen} setMenuOpen={setMenuOpen} navigate={navigate} onLogout={logout} onRoleChange={switchRole} toast={toast}>{content}</Layout>
 }

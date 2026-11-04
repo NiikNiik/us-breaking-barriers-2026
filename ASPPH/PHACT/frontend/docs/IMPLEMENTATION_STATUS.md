@@ -17,6 +17,11 @@
 - Recommendation editing, approval, rejection, and history.
 - Competency mapping and community contribution workflow.
 - Settings and local browser persistence.
+- Revised syllabus generation from accepted recommendations and confirmed mappings.
+- Structured syllabus preview/editor, submission confirmation, and original/revised comparison.
+- Shared mock-state faculty/admin submission workflow with persistent version history.
+- Administrator final syllabus approval/rejection with required rejection reason.
+- Faculty feedback, revision creation, resubmission, and approval tracking.
 
 ## Ready for backend integration
 
@@ -25,6 +30,7 @@
 - Explicit HTTP adapter that never silently falls back to mock data.
 - Proposed API handoff contracts.
 - Route and role integration points.
+- Typed syllabus-version, submission, and administrative-decision integration points.
 
 ## Requires backend implementation
 
@@ -35,7 +41,9 @@
 - Contract validation against the shared analysis schema.
 - Authorization for faculty/admin operations.
 - Durable review/version history and server-generated exports.
+- Backend-authoritative syllabus generation, artifact storage, and final approval persistence.
 
 ## Not implemented here
 
 - FastAPI server, AWS resources, agents, shared contracts, or deployments. Those remain outside the frontend scope.
+- Automated browser E2E suite; the two-role workflow was manually smoke-tested in the local preview.

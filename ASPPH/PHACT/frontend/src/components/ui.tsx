@@ -14,12 +14,13 @@ export type Page =
   | "settings"
   | "knowledge-admin"
   | "moderation"
+  | "community-moderation"
   | "privacy"
   | "terms"
 
 export const PAGES: Page[] = [
   "dashboard", "upload", "progress", "recommendations", "mapping", "review", "export",
-  "repository", "activity", "settings", "knowledge-admin", "moderation", "privacy", "terms",
+  "repository", "activity", "settings", "knowledge-admin", "moderation", "community-moderation", "privacy", "terms",
 ]
 
 const iconPaths: Record<string, ReactNode> = {
@@ -79,6 +80,12 @@ const iconPaths: Record<string, ReactNode> = {
     </>
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  bell: (
+    <>
+      <path d="M6 17h12l-1.5-2.5V10a4.5 4.5 0 0 0-9 0v4.5Z" />
+      <path d="M10 20h4" />
+    </>
+  ),
   close: <path d="m6 6 12 12M18 6 6 18" />,
   arrow: <path d="m9 18 6-6-6-6" />,
   chevron: <path d="m6 9 6 6 6-6" />,
@@ -146,12 +153,13 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
   )
 }
 
-export function BrandMark() {
+export function BrandMark({ full = false }: { full?: boolean }) {
   return (
-    <svg className="brand-mark" viewBox="0 0 36 36" aria-label="PHACT">
-      <path d="M18 2 32 10v16L18 34 4 26V10Z" fill="currentColor" />
-      <path d="M11 12h9a5 5 0 0 1 0 10h-4v5h-5Zm5 4v2h4a1 1 0 0 0 0-2Z" fill="#f7f6f2" />
-    </svg>
+    <img
+      className={`brand-mark ${full ? "brand-mark-full" : ""}`}
+      src={full ? "/branding/phact-logo-1.png" : "/branding/phact-logo-2.png"}
+      alt="PHACT - Public Health AI Curriculum Transformation Platform"
+    />
   )
 }
 

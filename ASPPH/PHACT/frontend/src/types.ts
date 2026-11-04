@@ -36,6 +36,64 @@ export interface Syllabus {
   status: "UPLOADED" | "ANALYZED" | "FAILED"
 }
 
+export type SyllabusStatus =
+  | "DRAFT"
+  | "GENERATING"
+  | "GENERATION_FAILED"
+  | "DRAFT_READY"
+  | "PENDING_ADMIN_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+
+export interface SyllabusSection {
+  id: string
+  title: string
+  content: string
+  order: number
+}
+
+export interface SyllabusVersion {
+  id: string
+  syllabusId: string
+  courseId: string
+  facultyId: string
+  versionNumber: number
+  status: SyllabusStatus
+  sections: SyllabusSection[]
+  appliedRecommendationIds: string[]
+  confirmedMappingIds: string[]
+  createdAt: string
+  updatedAt: string
+  submittedAt?: string
+}
+
+export interface ReviewSubmission {
+  id: string
+  syllabusId: string
+  syllabusVersionId: string
+  facultyId: string
+  submittedAt: string
+  status: "PENDING_ADMIN_REVIEW" | "APPROVED" | "REJECTED"
+}
+
+export interface AdminReviewDecision {
+  id: string
+  submissionId: string
+  syllabusVersionId: string
+  reviewerId: string
+  reviewerName: string
+  decision: "APPROVED" | "REJECTED"
+  reason?: string
+  reviewedAt: string
+}
+
+export interface SyllabusWorkflow {
+  syllabus: Syllabus
+  versions: SyllabusVersion[]
+  submissions: ReviewSubmission[]
+  decisions: AdminReviewDecision[]
+}
+
 export interface AnalysisJob {
   id: string
   syllabusId: string

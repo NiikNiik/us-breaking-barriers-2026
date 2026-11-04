@@ -106,7 +106,7 @@ export function ExportShare({ ctx }: { ctx: AppCtx }) {
             </section>
             <aside className="panel export-preview">
               <div className="paper">
-                <div className="paper-head"><BrandMark /> PHACT · Approved plan</div>
+                <div className="paper-head"><BrandMark /> <span>Approved plan</span></div>
                 <h2>{syllabus?.courseName}</h2>
                 <p>Prepared for {ctx.user.displayName} · {fmtDate(new Date().toISOString())}</p>
                 {opts.course && syllabus && (

@@ -13,9 +13,11 @@ export function Mapping({ ctx }: { ctx: AppCtx }) {
   const [filter, setFilter] = useState<"All" | CompetencyMapping["alignment"]>("All")
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState<string[]>([])
   useEffect(() => {
     if (ctx.activeJobId) api.getCompetencyMappings(ctx.activeJobId).then(setRows)
-  }, [ctx.activeJobId])
+    api.getConfirmedMappings(ctx.user).then(setConfirmed)
+  }, [ctx.activeJobId, ctx.user.id])
   const q = query.toLowerCase()
   const shown = rows.filter((r) => (filter === "All" || r.alignment === filter) && (!q || `${r.objective} ${r.competency} ${r.gap}`.toLowerCase().includes(q)))
   const count = (a: CompetencyMapping["alignment"]) => rows.filter((r) => r.alignment === a).length
@@ -88,6 +90,9 @@ export function Mapping({ ctx }: { ctx: AppCtx }) {
                           <span>How this alignment was determined</span>
                           <p>{r.reasoning}</p>
                           <p className="muted">PHACT compared the objective's wording and assessed skills with retrieved competency language. Confirm the alignment against your full course design.</p>
+                          <button className={confirmed.includes(r.id) ? "secondary small" : "primary small"} onClick={async () => setConfirmed(await api.confirmCompetencyMapping(ctx.user, r.id, !confirmed.includes(r.id)))}>
+                            {confirmed.includes(r.id) ? "Remove confirmation" : "Confirm mapping"}
+                          </button>
                         </div>
                       </td>
                     </tr>

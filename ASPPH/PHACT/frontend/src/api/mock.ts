@@ -15,6 +15,7 @@ import {
 } from "../mocks/fixtures/data"
 import type {
   ActivityItem,
+  AdminReviewDecision,
   AnalysisJob,
   CompetencyMapping,
   DashboardData,
@@ -27,9 +28,13 @@ import type {
   Role,
   SharedContribution,
   Syllabus,
+  SyllabusSection,
+  SyllabusVersion,
+  SyllabusWorkflow,
+  ReviewSubmission,
   SyncStatus,
 } from "../types"
-import type { PhactApi } from "./types"
+import type { FacultyNotification, PhactApi, RecommendationDecisionInput } from "./types"
 
 export const ANALYSIS_STAGES = [
   "Syllabus Uploaded",
@@ -43,7 +48,7 @@ export const ANALYSIS_STAGES = [
 ]
 
 const STAGE_MS = 850
-const DB_KEY = "phact-v2-db"
+const DB_KEY = "phact-v3-db"
 const SESSION_KEY = "phact-v2-session"
 const SETTINGS_KEY = "phact-v2-settings"
 
@@ -58,13 +63,18 @@ for (const key of [
 ]) localStorage.removeItem(key)
 
 interface Db {
-  version: 2
+  version: 3
   syllabi: Syllabus[]
   jobs: AnalysisJob[]
   recommendations: Recommendation[]
   contributions: SharedContribution[]
   sources: KnowledgeSource[]
   sync: SyncStatus
+  versions: SyllabusVersion[]
+  submissions: ReviewSubmission[]
+  decisions: AdminReviewDecision[]
+  confirmedMappings: Record<string, string[]>
+  notifications: FacultyNotification[]
 }
 
 const clone = <T>(value: T): T => structuredClone(value)
@@ -74,20 +84,25 @@ const uid = (prefix: string) =>
 
 function seed(): Db {
   return {
-    version: 2,
+    version: 3,
     syllabi: clone(seedSyllabi),
     jobs: clone(seedJobs),
     recommendations: clone(seedRecommendations),
     contributions: clone(seedContributions),
     sources: clone(seedSources),
     sync: { state: "COMPLETED", completedAt: "2025-02-25T13:14:00Z" },
+    versions: [],
+    submissions: [],
+    decisions: [],
+    confirmedMappings: {},
+    notifications: [],
   }
 }
 
 function load(): Db {
   try {
     const db = JSON.parse(localStorage.getItem(DB_KEY) || "") as Db
-    if (db.version === 2) return db
+    if (db.version === 3) return { ...db, notifications: db.notifications || [] }
   } catch {
     /* fall through to seed */
   }
@@ -245,6 +260,39 @@ function withSettings(user: FacultyUser): FacultyUser {
 function requestSyncOn(db: Db) {
   if (db.sync.state === "REQUESTED" || db.sync.state === "IN_PROGRESS") return
   db.sync = { state: "REQUESTED", requestedAt: now(), completedAt: db.sync.completedAt }
+}
+
+function syllabusSections(
+  syllabus: Syllabus,
+  recommendations: Recommendation[],
+  mappings: CompetencyMapping[],
+): SyllabusSection[] {
+  const accepted = recommendations.filter((r) => r.status === "APPROVED")
+  const mappingText = mappings.length
+    ? mappings.map((m) => `${m.competency}: ${m.improvement}`).join("\n")
+    : "No competency mappings have been confirmed yet."
+  const activities = accepted.length
+    ? accepted.map((r) => `${r.title}\n${r.description}`).join("\n\n")
+    : "No faculty-approved AI curriculum recommendations have been incorporated."
+  return [
+    { id: "course-information", title: "Course information", content: `${syllabus.courseName}\n${syllabus.subject}\n\nFaculty-owned syllabus revision`, order: 1 },
+    { id: "description", title: "Course description", content: syllabus.description || "Course description to be completed by faculty.", order: 2 },
+    { id: "objectives", title: "Learning objectives", content: "Students will apply public health concepts, evaluate evidence, and communicate defensible conclusions.", order: 3 },
+    { id: "activities", title: "Recommended learning activities", content: activities, order: 4 },
+    { id: "competencies", title: "Competency alignment", content: mappingText, order: 5 },
+    { id: "schedule", title: "Schedule", content: "Week 1: Foundations\nWeeks 2-6: Applied public health practice\nFinal week: Synthesis and reflection", order: 6 },
+    { id: "assessment", title: "Assessment methods and grading policies", content: "Assessment methods, grading weights, deadlines, prerequisites, and institutional policies remain faculty-controlled. Review and confirm these details before submission.\n\nOriginal source context:\n" + syllabus.extractedText.slice(0, 700), order: 7 },
+    { id: "materials", title: "Required materials and academic policies", content: "Required materials and academic policies should be confirmed against the original syllabus before submission.", order: 8 },
+  ]
+}
+
+function workflowFor(db: Db, syllabus: Syllabus): SyllabusWorkflow {
+  return {
+    syllabus: clone(syllabus),
+    versions: clone(db.versions.filter((v) => v.syllabusId === syllabus.id).sort((a, b) => b.versionNumber - a.versionNumber)),
+    submissions: clone(db.submissions.filter((s) => s.syllabusId === syllabus.id).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))),
+    decisions: clone(db.decisions.filter((d) => db.submissions.find((s) => s.id === d.submissionId)?.syllabusId === syllabus.id).sort((a, b) => b.reviewedAt.localeCompare(a.reviewedAt))),
+  }
 }
 
 export const api: PhactApi = {
@@ -466,6 +514,123 @@ export const api: PhactApi = {
     return mutate((db) => {
       const job = db.jobs.find((j) => j.id === jobId)
       return job?.status === "COMPLETED" ? competencyMappings : []
+    })
+  },
+  confirmCompetencyMapping(user: FacultyUser, mappingId: string, confirmed: boolean): Promise<string[]> {
+    return mutate((db) => {
+      const ids = db.confirmedMappings[user.id] || []
+      db.confirmedMappings[user.id] = confirmed ? Array.from(new Set([...ids, mappingId])) : ids.filter((id) => id !== mappingId)
+      return db.confirmedMappings[user.id]
+    })
+  },
+  getConfirmedMappings(user: FacultyUser): Promise<string[]> {
+    return mutate((db) => db.confirmedMappings[user.id] || [])
+  },
+
+  getSyllabusWorkflow(user: FacultyUser, syllabusId?: string): Promise<SyllabusWorkflow | null> {
+    return mutate((db) => {
+      const syllabus = db.syllabi.find((s) => (!syllabusId || s.id === syllabusId) && (user.role === "admin" || s.facultyId === user.id))
+      return syllabus ? workflowFor(db, syllabus) : null
+    })
+  },
+  listSyllabusWorkflows(user: FacultyUser, scope: "faculty" | "admin" = user.role === "admin" ? "admin" : "faculty"): Promise<SyllabusWorkflow[]> {
+    return mutate((db) => db.syllabi.filter((s) => scope === "admin" || s.facultyId === user.id).map((s) => workflowFor(db, s)).filter((w) => w.versions.length > 0))
+  },
+  generateSyllabus(user: FacultyUser, syllabusId: string): Promise<SyllabusVersion> {
+    return mutate((db) => {
+      const syllabus = db.syllabi.find((s) => s.id === syllabusId && s.facultyId === user.id)
+      if (!syllabus) throw new Error("Syllabus not found")
+      const job = db.jobs.find((j) => j.syllabusId === syllabusId && j.facultyId === user.id && j.status === "COMPLETED")
+      if (!job) throw new Error("Complete the syllabus analysis before generating a revision.")
+      const recs = db.recommendations.filter((r) => r.syllabusId === syllabusId)
+      const mappingIds = db.confirmedMappings[user.id] || []
+      const mappings = competencyMappings.filter((m) => mappingIds.includes(m.id))
+      const previous = db.versions.filter((v) => v.syllabusId === syllabusId)
+      const at = now()
+      const version: SyllabusVersion = {
+        id: uid("version"), syllabusId, courseId: syllabusId, facultyId: user.id,
+        versionNumber: previous.length + 1, status: "DRAFT_READY",
+        sections: syllabusSections(syllabus, recs, mappings),
+        appliedRecommendationIds: recs.filter((r) => r.status === "APPROVED").map((r) => r.id),
+        confirmedMappingIds: mappingIds,
+        createdAt: at, updatedAt: at,
+      }
+      db.versions.push(version)
+      return version
+    })
+  },
+  saveSyllabusDraft(user: FacultyUser, versionId: string, sections: SyllabusSection[]): Promise<SyllabusVersion> {
+    return mutate((db) => {
+      const version = db.versions.find((v) => v.id === versionId && v.facultyId === user.id)
+      if (!version || !["DRAFT", "DRAFT_READY"].includes(version.status)) throw new Error("Only an editable draft can be saved.")
+      if (sections.some((s) => !s.title.trim() || !s.content.trim())) throw new Error("Every syllabus section needs a title and content.")
+      version.sections = sections.map((s, i) => ({ ...s, order: i + 1 }))
+      version.updatedAt = now()
+      return version
+    })
+  },
+  submitSyllabus(user: FacultyUser, versionId: string): Promise<ReviewSubmission> {
+    return mutate((db) => {
+      const version = db.versions.find((v) => v.id === versionId && v.facultyId === user.id)
+      if (!version || !["DRAFT", "DRAFT_READY"].includes(version.status)) throw new Error("Only an editable draft can be submitted.")
+      if (version.sections.some((s) => !s.content.trim())) throw new Error("Complete every syllabus section before submitting.")
+      if (db.submissions.some((s) => s.syllabusVersionId === versionId && s.status === "PENDING_ADMIN_REVIEW")) throw new Error("This version is already pending administrative review.")
+      const at = now()
+      version.status = "PENDING_ADMIN_REVIEW"
+      version.submittedAt = at
+      version.updatedAt = at
+      const submission: ReviewSubmission = { id: uid("submission"), syllabusId: version.syllabusId, syllabusVersionId: version.id, facultyId: user.id, submittedAt: at, status: "PENDING_ADMIN_REVIEW" }
+      db.submissions.push(submission)
+      return submission
+    })
+  },
+  createRevision(user: FacultyUser, versionId: string): Promise<SyllabusVersion> {
+    return mutate((db) => {
+      const previous = db.versions.find((v) => v.id === versionId && v.facultyId === user.id)
+      if (!previous || previous.status !== "REJECTED") throw new Error("Only a rejected version can be revised.")
+      const at = now()
+      const revision: SyllabusVersion = { ...clone(previous), id: uid("version"), versionNumber: Math.max(...db.versions.filter((v) => v.syllabusId === previous.syllabusId).map((v) => v.versionNumber)) + 1, status: "DRAFT_READY", createdAt: at, updatedAt: at, submittedAt: undefined }
+      db.versions.push(revision)
+      return revision
+    })
+  },
+  decideSyllabus(user: FacultyUser, submissionId: string, decision: "APPROVED" | "REJECTED", reason?: string): Promise<AdminReviewDecision> {
+    return mutate((db) => {
+      if (user.role !== "admin") throw new Error("Administrator access is required.")
+      const submission = db.submissions.find((s) => s.id === submissionId)
+      if (!submission || submission.status !== "PENDING_ADMIN_REVIEW") throw new Error("This submission has already been reviewed or no longer exists.")
+      if (decision === "REJECTED" && !reason?.trim()) throw new Error("A rejection reason is required.")
+      const at = now()
+      submission.status = decision
+      const version = db.versions.find((v) => v.id === submission.syllabusVersionId)!
+      version.status = decision
+      version.updatedAt = at
+      const record: AdminReviewDecision = { id: uid("decision"), submissionId, syllabusVersionId: version.id, reviewerId: user.id, reviewerName: user.displayName, decision, reason: reason?.trim() || undefined, reviewedAt: at }
+      db.decisions.push(record)
+      db.notifications.push({ id: uid("notification"), type: decision === "APPROVED" ? "SYLLABUS_APPROVED" : "SYLLABUS_REJECTED", syllabusId: submission.syllabusId, submissionId, reviewedVersion: version.versionNumber, title: decision === "APPROVED" ? "Syllabus approved" : "Revision requested", message: decision === "APPROVED" ? `${version.versionNumber === 1 ? "Your syllabus" : `Version ${version.versionNumber} of your syllabus`} was approved by ${user.displayName}.` : `${user.displayName} requested a revision: ${reason!.trim()}`, createdAt: at })
+      return record
+    })
+  },
+  saveRecommendationDecisions(_reviewId: string, decisions: RecommendationDecisionInput[]): Promise<void> {
+    return mutate((db) => {
+      for (const decision of decisions) {
+        const recommendation = db.recommendations.find((r) => r.id === decision.recommendationId)
+        if (!recommendation) continue
+        if (decision.decision === "ACCEPTED") recommendation.status = "APPROVED"
+        if (decision.decision === "REJECTED") recommendation.status = "REJECTED"
+        if (decision.decision === "EDITED" && decision.editedText?.trim()) recommendation.description = decision.editedText.trim()
+        recommendation.updatedAt = now()
+      }
+    })
+  },
+  listNotifications(user: FacultyUser): Promise<FacultyNotification[]> {
+    return mutate((db) => db.notifications.filter((n) => { const submission = db.submissions.find((s) => s.id === n.submissionId); return submission?.facultyId === user.id }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+  },
+  markNotificationRead(user: FacultyUser, notificationId: string): Promise<void> {
+    return mutate((db) => {
+      const notification = db.notifications.find((n) => n.id === notificationId)
+      const submission = notification && db.submissions.find((s) => s.id === notification.submissionId)
+      if (notification && submission?.facultyId === user.id) notification.readAt = now()
     })
   },
 
